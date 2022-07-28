@@ -78,24 +78,24 @@ Hr1_array=[Hr1]
 Hr2_array=[0]
 
 #подфункция для расчета всех основных параметров в трубопроводе. Испоьлзуется для итерационного поиска этих самых параметров.
-#необходимость использования итерационного поиска вызвана тем, что рассчет основывается на величине расход жидкости, которая изначально неизвестная
+#необходимость использования итерационного поиска вызвана тем, что рассчет основывается на величине расход жидкости, которая изначально неизвестна
 #на выходе эта функция выдает невязку по давлению на выходе из трубы и давлению в точке, куда выходит эта труба
-def iteration(Q_,pump_status,valve_status,dt):
+def iteration(Q_,pump_status,valve_status,dt,Hr1):
     #находим напор насоса
     if pump_status:
         Hp=Pump_H_Q(Q_)
     else:
         Hp=0.
-    #уравнение Бернулли для трубы 1 p1/Rho/g == Lp1 + p2/Rho/g + V2**2/2/g + a2*Lp1/g + dHf1
+    #уравнение Бернулли для трубы 1 p1/Rho/g + h_reservoir == Lp1 + p2/Rho/g + V2**2/2/g  + dHf1 (+ a2*Lp1/g - нестационарный член)
     V2=Q_/Fp1 #находим в первом приближении скорость исходя из значения на предыдущем шаге
-    dHfriction_pipe1 = dHf1(V2, Dp1, Nu, Lp1, g)
-    P2 = (Pr1 / Rho / g - Lp1 - V2 ** 2 / 2 / g - dHfriction_pipe1) * Rho * g
+    dHfriction_pipe1 = dHf1(V2, Dp1, Nu, Lp1, g) #потери давления на трение в трубе 1
+    P2 = (Pr1 / Rho / g + Hr1 - Lp1 - V2 ** 2 / 2 / g - dHfriction_pipe1) * Rho * g
     #найдем уд.энергию потока перед насосом
     H2=P2/Rho/g + V2**2/2/g
     E2 = H2*g #дж/кг
-    # энергия подводимая насосом за интервал времени dt (из уравнения мощности насоса N = Q*Rho*g*H или E/dt = Volume/dt*Rho*g*H)
+    # уд. энергия подводимая насосом за интервал времени dt (из уравнения мощности насоса N = Q*Rho*g*H или E/dt = Volume/dt*Rho*g*H)
     Ep=(Hp*g)
-    # найдем уд.энергию потока перед за насосом
+    # найдем уд.энергию потока за насосом
     # H3=H2+Hp
     E3 = E2 + Ep
     #параметры потока во второй трубе
@@ -105,7 +105,11 @@ def iteration(Q_,pump_status,valve_status,dt):
     dHvalve = dhValve(V3,Dp2,Nu,g,valve_status)
     dHfriction_pipe2 = dHf2(V4, Dp2, Nu, Lp2, g)
     # P4 = (H3 - (Lp2 + V4 ** 2 / 2 / g + dHfriction_pipe2 + dHvalve)) * Rho * g
-    P4=(E3-V4**2/2-g*Lp2-dHfriction_pipe2-dHvalve)*Rho
+    # P4=(E3-V4**2/2-g*Lp2-dHfriction_pipe2-dHvalve)*Rho
+    #из уравнения Бернули для трубы 2: H2+H_pump == p3/Rho/g + V3**2/2/g + dH_valve == Lp2 + p4/Rho/g + V4**2/2/g  + dHf2 + dH_valve
+    P4=((H2+Hp)-(Lp2 + V4**2/2/g  + dHfriction_pipe2 + dHvalve))*Rho*g
+
+
     # P4 = (E3 - g * Lp2 - dHfriction_pipe2 - dHvalve) * Rho
     error=P4-Pr2 #невязка по давлению на выходе из трубопровода, она д.б. равна 0, для этого нужно найти правильное значение расхода
     return error
@@ -135,11 +139,11 @@ for i in range(1,int(T/dt)):
         else:
             _x0=Q[i - 1]
             _x1=Q[i - 1]*1.0001
-        #тут я пробовал разные методы поиска корня, т.к. были проблемы с поиском расход при изменении положения клапана
-        Qnew=root_scalar(iteration,x0=_x0,x1=_x1,method='secant',args=(pump_status,valve_status,dt))
+        #тут я пробовал разные методы поиска корня, т.к. были проблемы с поиском расхода при изменении положения клапана
+        Qnew=root_scalar(iteration,x0=_x0,x1=_x1,method='secant',args=(pump_status,valve_status,dt,Hr1))
         # Qnew = root_scalar(iteration, bracket=(0, 10*Q[i - 1]), method='toms748', args=(pump_status, valve_status,dt))
         # if Qnew.root<0:
-        #     # Qnew = root_scalar(iteration, bracket=(0,Q[i - 1]), method='toms748', args=(pump_status, valve_status))
+        #     Qnew = root_scalar(iteration, bracket=(0,Q[i - 1]), method='toms748', args=(pump_status, valve_status))
         #     Qnew = root_scalar(iteration, x0=0.000001, x1=0.000002, method='secant', args=(pump_status, valve_status,dt))
         Q.append(Qnew.root)
     else:
@@ -154,7 +158,7 @@ for i in range(1,int(T/dt)):
     # уравнение Бернулли для трубы 1 p1/Rho/g == Lp1 + p2/Rho/g + V2**2/2/g + a2*Lp1/g + dHf1
     V2 = Q[i] / Fp1
     dHfriction_pipe1=dHf1(V2,Dp1,Nu,Lp1,g)
-    P2 = (Pr1 / Rho / g - Lp1 - V2 ** 2 / 2 / g - dHfriction_pipe1) * Rho * g
+    P2 = (Pr1 / Rho / g + Hr1 - Lp1 - V2 ** 2 / 2 / g - dHfriction_pipe1) * Rho * g
     if dP_cavitation < Pr1 -P2 :
         print(f'Warning! Possible cavitation P2={P2}')
     # найдем энергию потока перед насосом и за ним
@@ -199,14 +203,14 @@ for i in range(1,int(T/dt)):
     Hr2_array.append(Hr2)
 
 
-fig1=mc.Chart(points_for_plot=[{'x':time,'y':P_pump_inlet,'label':'P_pump_inlet'},{'x':time,'y':P_pump_outlet,'label':'P_pump_outlet'}],xlabel='t',ylabel='P', dpi=150,figure_size=(5,5))
-fig2=mc.Chart(points_for_plot=[{'x':time,'y':Q,'label':'Q'}],xlabel='t',ylabel='Q', dpi=150,figure_size=(5,5))
-fig3=mc.Chart(points_for_plot=[{'x':time,'y':V_pipe1_outlet,'label':'V_pipe1_outlet'},{'x':time,'y':V_pipe2_inlet,'label':'V_pipe2_inlet'},{'x':time,'y':V_pipe2_outlet,'label':'V_pipe2_outlet'}],xlabel='t',ylabel='V', dpi=150,figure_size=(5,5))
-fig4=mc.Chart(points_for_plot=[{'x':time,'y':dH_valve_result,'label':'dH_valve_result'}],xlabel='t',ylabel='dH_valve_result', dpi=150,figure_size=(5,5))
+fig1=mc.Chart(points_for_plot=[{'x':time,'y':P_pump_inlet,'label':'P_pump_inlet'},{'x':time,'y':P_pump_outlet,'label':'P_pump_outlet'}],xlabel='t',ylabel='P',title='Pressures', dpi=150,figure_size=(5,5))
+fig2=mc.Chart(points_for_plot=[{'x':time,'y':Q,'label':'Q'}],xlabel='t',ylabel='Q',title='Volume flow', dpi=150,figure_size=(5,5))
+fig3=mc.Chart(points_for_plot=[{'x':time,'y':V_pipe1_outlet,'label':'V_pipe1_outlet'},{'x':time,'y':V_pipe2_inlet,'label':'V_pipe2_inlet'},{'x':time,'y':V_pipe2_outlet,'label':'V_pipe2_outlet'}],xlabel='t',ylabel='V',title='Velocities', dpi=150,figure_size=(5,5))
+fig4=mc.Chart(points_for_plot=[{'x':time,'y':dH_valve_result,'label':'dH_valve_result'}],xlabel='t',ylabel='dH_valve_result',title='Pressure drop in valve', dpi=150,figure_size=(5,5))
 # fig5=mc.Chart(points_for_plot=[{'x':time,'y':E2_array,'label':'E2_array'},{'x':time,'y':E3_array,'label':'E3_array'},{'x':time,'y':Ep_array,'label':'Ep_array'}],xlabel='t',ylabel='E', dpi=150,figure_size=(5,5))
-fig6=mc.Chart(points_for_plot=[{'x':time,'y':Hp_array,'label':'Hp_array'}],xlabel='t',ylabel='H', dpi=150,figure_size=(5,5))
-fig7=mc.Chart(points_for_plot=[{'x':time,'y':dH_pipe1,'label':'dH_pipe1'},{'x':time,'y':dH_pipe2,'label':'dH_pipe2'}],xlabel='t',ylabel='dH_pipe', dpi=150,figure_size=(5,5))
-fig8=mc.Chart(points_for_plot=[{'x':time,'y':Hr1_array,'label':'Hr1_array'},{'x':time,'y':Hr2_array,'label':'Hr2_array'}],xlabel='t',ylabel='Hr', dpi=150,figure_size=(5,5))
+fig6=mc.Chart(points_for_plot=[{'x':time,'y':Hp_array,'label':'Hp_array'}],xlabel='t',ylabel='H',title='Pump head', dpi=150,figure_size=(5,5))
+fig7=mc.Chart(points_for_plot=[{'x':time,'y':dH_pipe1,'label':'dH_pipe1'},{'x':time,'y':dH_pipe2,'label':'dH_pipe2'}],xlabel='t',ylabel='dH_pipe',title='Pressure drop in pipes', dpi=150,figure_size=(5,5))
+fig8=mc.Chart(points_for_plot=[{'x':time,'y':Hr1_array,'label':'Hr1_array'},{'x':time,'y':Hr2_array,'label':'Hr2_array'}],xlabel='t',ylabel='Hr',title='Levels in reservoirs', dpi=150,figure_size=(5,5))
 plt.show()
 
 

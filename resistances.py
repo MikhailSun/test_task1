@@ -14,6 +14,7 @@ curve2_f=interp1d(curve2_Re, curve2_dzita,bounds_error=False,fill_value=(0.25e3,
 curve3_f=interp1d(curve3_Re, curve3_dzita,bounds_error=False,fill_value=(0.5e2,0.8),kind='quadratic')
 f_array=[curve1_f,curve2_f,curve3_f]
 
+#из Идельчика
 def dH_valve2(V,D,Nu,g,valve_status):
     Re = V * D / Nu
     Re = 1 if Re < 1 else Re
@@ -21,6 +22,13 @@ def dH_valve2(V,D,Nu,g,valve_status):
     y_array=[f(Re) for f in f_array]
     dzita=interp1d(x_array, y_array,bounds_error=False) #коэффициент гидравлического сопротивления клапана
     return dzita(1-valve_status)*V**2/2/g
+
+#из Миллера "internal flow systems"
+def dH_valve3(x,V,g):
+    open_status=[0,1/9,2/9,3/9,4/9,5/9,6/9,7/9,8/9,1]
+    dzita_array=[10000,500,100,40,10,7.5,3,1.1,0.5,0.01]
+    dzita = interp1d(open_status, dzita_array, bounds_error=False, fill_value="extrapolate", kind='quadratic')
+    return dzita(x) * V ** 2 / 2 / g
 
 #потери в регулируемом клапане, заданном как поток через отверстие (Идельчик)
 #valve_status = 0...1 (1 - клапан открыт, 0 - закрыт)

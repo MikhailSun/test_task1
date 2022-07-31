@@ -7,7 +7,7 @@ import resistances as rs
 #Исходные данные (все единицы в СИ, если не указано иное)
 #Резервуар 1 (источник)
 Dr1=3.
-Hr1=3.
+Hr1=10.
 Sr1=np.pi*(Dr1/2)**2
 Vr1=Sr1*Hr1
 Pr1=100000. #Па, это только атмосферное давление без учета давления от столба жидкости
@@ -19,7 +19,7 @@ Vr2=Sr2*Hr2
 Pr2=100000. #Па
 #труба 1 (от резервуара до насоса)
 Lp1=1. #имеется ввиду в том числе перепад трубы по высоте, для простоты примем, что он равен физической длине трубы
-Dp1=0.2
+Dp1=0.25
 Fp1=np.pi*(Dp1/2)**2
 dHf1=rs.dH_pipe #потери трения
 #труба 2 (от клапана до слива)
@@ -28,8 +28,8 @@ Dp2=0.3
 Fp2=np.pi*(Dp2/2)**2
 dHf2=rs.dH_pipe #потери трения
 #насос (между трубой 1 и трубой 2)
-Q = [0., 0.05, 0.1, 0.5] #объемный расход для характеристики насоса (м3/с)
-H = [30., 15., 10., 1.] #напор для характеристики насоса, м
+Q = [0., 0.1, 0.2, 0.3, 0.4, 0.5] #объемный расход для характеристики насоса (м3/с)
+H = [30., 29., 28., 25.,15., 1.] #напор для характеристики насоса, м
 Pump_H_Q = interp1d(Q, H,bounds_error=False,fill_value=(15,0),kind='quadratic') #функция с характеристикой насоса, по умолчанию они использует линейню интерполяцию
 #клапан
 dhValve=rs.dH_valve2
@@ -203,14 +203,18 @@ for i in range(1,int(T/dt)):
     Hr2_array.append(Hr2)
 
 
-fig1=mc.Chart(points_for_plot=[{'x':time,'y':P_pump_inlet,'label':'P_pump_inlet'},{'x':time,'y':P_pump_outlet,'label':'P_pump_outlet'}],xlabel='t',ylabel='P',title='Pressures', dpi=150,figure_size=(5,5))
-fig2=mc.Chart(points_for_plot=[{'x':time,'y':Q,'label':'Q'}],xlabel='t',ylabel='Q',title='Volume flow', dpi=150,figure_size=(5,5))
-fig3=mc.Chart(points_for_plot=[{'x':time,'y':V_pipe1_outlet,'label':'V_pipe1_outlet'},{'x':time,'y':V_pipe2_inlet,'label':'V_pipe2_inlet'},{'x':time,'y':V_pipe2_outlet,'label':'V_pipe2_outlet'}],xlabel='t',ylabel='V',title='Velocities', dpi=150,figure_size=(5,5))
-fig4=mc.Chart(points_for_plot=[{'x':time,'y':dH_valve_result,'label':'dH_valve_result'}],xlabel='t',ylabel='dH_valve_result',title='Pressure drop in valve', dpi=150,figure_size=(5,5))
+fig1=mc.Chart(points_for_plot=[{'x':time,'y':P_pump_inlet,'label':'P_pump_inlet'},{'x':time,'y':P_pump_outlet,'label':'P_pump_outlet'}],xlabel='t',ylabel='P, bar',title='Pressures', dpi=150,figure_size=(5,5))
+fig2=mc.Chart(points_for_plot=[{'x':time,'y':Q,'label':'Q'}],xlabel='t',ylabel='Q, m3/s',title='Volume flow', dpi=150,figure_size=(5,5))
+fig3=mc.Chart(points_for_plot=[{'x':time,'y':V_pipe1_outlet,'label':'V_pipe1_outlet'},{'x':time,'y':V_pipe2_inlet,'label':'V_pipe2_inlet'},{'x':time,'y':V_pipe2_outlet,'label':'V_pipe2_outlet'}],xlabel='t',ylabel='V, m/s',title='Velocities', dpi=150,figure_size=(5,5))
+fig4=mc.Chart(points_for_plot=[{'x':time,'y':dH_valve_result,'label':'dH_valve_result'}],xlabel='t',ylabel='dH_valve_result, m',title='Pressure drop in valve', dpi=150,figure_size=(5,5))
 # fig5=mc.Chart(points_for_plot=[{'x':time,'y':E2_array,'label':'E2_array'},{'x':time,'y':E3_array,'label':'E3_array'},{'x':time,'y':Ep_array,'label':'Ep_array'}],xlabel='t',ylabel='E', dpi=150,figure_size=(5,5))
-fig6=mc.Chart(points_for_plot=[{'x':time,'y':Hp_array,'label':'Hp_array'}],xlabel='t',ylabel='H',title='Pump head', dpi=150,figure_size=(5,5))
-fig7=mc.Chart(points_for_plot=[{'x':time,'y':dH_pipe1,'label':'dH_pipe1'},{'x':time,'y':dH_pipe2,'label':'dH_pipe2'}],xlabel='t',ylabel='dH_pipe',title='Pressure drop in pipes', dpi=150,figure_size=(5,5))
-fig8=mc.Chart(points_for_plot=[{'x':time,'y':Hr1_array,'label':'Hr1_array'},{'x':time,'y':Hr2_array,'label':'Hr2_array'}],xlabel='t',ylabel='Hr',title='Levels in reservoirs', dpi=150,figure_size=(5,5))
+fig6=mc.Chart(points_for_plot=[{'x':time,'y':Hp_array,'label':'Hp_array'}],xlabel='t',ylabel='H, m',title='Pump head', dpi=150,figure_size=(5,5))
+fig7=mc.Chart(points_for_plot=[{'x':time,'y':dH_pipe1,'label':'dH_pipe1'},{'x':time,'y':dH_pipe2,'label':'dH_pipe2'}],xlabel='t',ylabel='dH, m',title='Pressure drop in pipes', dpi=150,figure_size=(5,5))
+fig8=mc.Chart(points_for_plot=[{'x':time,'y':Hr1_array,'label':'Hr1_array'},{'x':time,'y':Hr2_array,'label':'Hr2_array'}],xlabel='t',ylabel='Hr, m',title='Levels in reservoirs', dpi=150,figure_size=(5,5))
+
+Q_array=np.linspace(0,0.5,100)
+H_array=[Pump_H_Q(Q) for Q in Q_array]
+fig9=mc.Chart(points_for_plot=[{'x':Q_array,'y':H_array,'label':'Pump map'}],xlabel='Q, m3/s',ylabel='H, m',title='Pump map', dpi=150,figure_size=(5,5))
 plt.show()
 
 
